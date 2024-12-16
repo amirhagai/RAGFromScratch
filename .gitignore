@@ -1,0 +1,15 @@
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+
+# Ignore environment files
+.env
+
+# Ignore log files
+*.log
+
+# Ignore node_modules (if using Node.js)
+node_modules/
+
+# Ignore Docker build files
+*.tar
