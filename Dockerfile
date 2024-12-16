@@ -39,9 +39,11 @@ RUN pip install --no-cache-dir \
     pandas \
     keybert \
     ctransformers[cuda] \
-    python-dotenv
+    python-dotenv 
+
 
 RUN pip install -U sentence-transformers==2.2.2
+RUN pip install langchain-huggingface
 
 # Verify GPU availability in Python
 RUN python -c "import torch; print('CUDA Available:', torch.cuda.is_available())"
