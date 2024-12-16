@@ -39,7 +39,9 @@ RUN pip install --no-cache-dir \
     pandas \
     keybert \
     ctransformers[cuda] \
-    git+https://github.com/UKPLab/sentence-transformers
+    python-dotenv
+
+RUN pip install -U sentence-transformers==2.2.2
 
 # Verify GPU availability in Python
 RUN python -c "import torch; print('CUDA Available:', torch.cuda.is_available())"
