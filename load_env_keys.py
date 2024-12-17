@@ -14,3 +14,5 @@ def load_env_keys():
     os.environ['USER_AGENT'] = os.getenv('USER_AGENT', 'myagent')
 
 
+def offline_transformers():
+    os.environ['TRANSFORMERS_OFFLINE'] = os.getenv('TRANSFORMERS_OFFLINE')
