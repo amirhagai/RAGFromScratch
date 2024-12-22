@@ -44,6 +44,8 @@ RUN pip install --no-cache-dir \
 
 RUN pip install -U sentence-transformers==2.2.2
 RUN pip install langchain-huggingface
+RUN pip install -U langchain-community
+RUN pip install 'accelerate>=0.26.0'
 
 # Verify GPU availability in Python
 RUN python -c "import torch; print('CUDA Available:', torch.cuda.is_available())"
