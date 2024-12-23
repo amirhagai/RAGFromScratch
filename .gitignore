@@ -11,5 +11,8 @@ __pycache__/
 # Ignore node_modules (if using Node.js)
 node_modules/
 chroma_langchain_db/
+meta-llama
+models*
+.vscode
 # Ignore Docker build files
 *.tar
