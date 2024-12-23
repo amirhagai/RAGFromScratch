@@ -1,5 +1,15 @@
 from load_env_keys import load_env_keys, offline_transformers
 load_env_keys()
+offline_transformers()
+import torch
+import os
+from transformers import set_seed
+set_seed(42)
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+torch.use_deterministic_algorithms(True, warn_only=True)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 import bs4
 from langchain import hub
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -14,6 +24,11 @@ from langchain.load import dumps, loads
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from operator import itemgetter
+import transformers
+from get_llama import get_llama
+from get_embedding_model import EmbedModel
+
+
 
 
 def load_web_doc(web_addresses="https://lilianweng.github.io/posts/2023-06-23-agent/"):
@@ -35,7 +50,7 @@ def split_docs(docs, chunk_size=500, chunk_overlap=300):
 
 def embed(splits, k=5):
     vectorstore = Chroma.from_documents(documents=splits, 
-                                        embedding=OpenAIEmbeddings(),
+                                        embedding=EmbedModel(), #OpenAIEmbeddings(),
                                         collection_name="example_collection",
                                         persist_directory="./chroma_langchain_db",)
     retriever = vectorstore.as_retriever(search_kwargs={"k": k})
@@ -43,11 +58,11 @@ def embed(splits, k=5):
 
 
 
-def load_prompt_and_model(prompt_identifier="rlm/rag-prompt", model_name="gpt-3.5-turbo"):
+def load_prompt_and_model(prompt_identifier="rlm/rag-prompt", model_name="gpt-3.5-turbo", max_new_tokns=256):
     
     prompt = hub.pull(prompt_identifier)
     #print(dict(prompt)['messages'][0].prompt.template)
-    llm = ChatOpenAI(model_name=model_name, temperature=0)
+    # llm = ChatOpenAI(model_name=model_name, temperature=0)
     # llm = HuggingFacePipeline.from_model_id(
     # model_id="google/flan-t5-large", #"Qwen/Qwen2.5-32B-Instruct",
     # task="text-generation",
@@ -58,7 +73,8 @@ def load_prompt_and_model(prompt_identifier="rlm/rag-prompt", model_name="gpt-3.
     #     "temperature": 1e-3,
     # },  
     # )
-    offline_transformers()
+
+    llm = get_llama(max_new_tokens=max_new_tokns)
     return prompt, llm
 
 
@@ -84,9 +100,11 @@ def get_multy_queries_generator(str_num_queries):
     the user overcome some of the limitations of the distance-based similarity search. 
     Provide these alternative questions separated by newlines. Original question: {{question}}"""
     prompt_perspectives = ChatPromptTemplate.from_template(template)
+    # llm = ChatOpenAI(temperature=0)
+    llm = get_llama()
     generate_queries = (
         prompt_perspectives 
-        | ChatOpenAI(temperature=0) 
+        | llm
         | StrOutputParser() 
         | (lambda x: x.split("\n"))
     )
@@ -102,15 +120,20 @@ def get_unique_union(documents: list[list]):
     # Return
     return [loads(doc) for doc in unique_docs]
 
+def use_pipe_directly_example(msg):
+    return llm.pipeline(
+                    [msg],
+                    **{'return_tensors' : True},
+                )
 
 def get_multy_query_rag_retrival_chain(retriever):
     # Retrieve
     generate_queries =  get_multy_queries_generator("five")
     retrieval_chain = generate_queries | retriever.map() | get_unique_union
-    return retrieval_chain
+    return retrieval_chain, generate_queries 
 
-def multy_query_rag(retriver, prompt, llm, question):
-    retrieval_chain = get_multy_query_rag_retrival_chain(retriever)
+def multy_query_rag(retriever, prompt, llm, question):
+    retrieval_chain, generate_queries  = get_multy_query_rag_retrival_chain(retriever)
     rag_chain = (
         {"context": retrieval_chain, "question": itemgetter("question")} 
         | prompt
@@ -120,24 +143,27 @@ def multy_query_rag(retriver, prompt, llm, question):
     result = rag_chain.invoke({"question":question})
     return result
 
-def define_base_chain(retriever, prompt, llm):
-    rag_chain = (
+
+def get_retrive_prompt_chain(retriever, prompt):
+    retrive_prompt_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
-        | llm
-        | StrOutputParser()
     )
-    return rag_chain
+    return retrive_prompt_chain
 
-docs = load_web_doc()
-text_splitter, splits = split_docs(docs=docs)
-vectorstore, retriever = embed(splits=splits)
-prompt, llm = load_prompt_and_model()
-rag_chain = define_base_chain(retriever=retriever, prompt=prompt, llm=llm)
 
-res = rag_chain.invoke("What is Task Decomposition?")
-# Question
-print(rag_chain.invoke("What is Task Decomposition?"))
+def llama_rag(return_full_text):
+    docs = load_web_doc()
+    text_splitter, splits = split_docs(docs=docs)
+    vectorstore, retriever = embed(splits=splits)
+    prompt, llm = load_prompt_and_model(max_new_tokns=256)
+    retrive_prompt_chain = get_retrive_prompt_chain(retriever, prompt)
+    retrive_prompt = retrive_prompt_chain.invoke("What is Task Decomposition?")
+    respones = llm.invoke(retrive_prompt.messages[0].content, pipeline_kwargs={'return_full_text' : return_full_text})
+    return docs, text_splitter, splits, vectorstore, retriever, prompt, llm, retrive_prompt_chain, retrive_prompt, respones
 
-res = multy_query_rag(retriever, prompt, llm, "What is Task Decomposition?")
-print(res)
+
+
+if __name__ == '__main__':
+    docs, text_splitter, splits, vectorstore, retriever, prompt, llm, retrive_prompt_chain, retrive_prompt, respones = llama_rag(return_full_text=False)
+    print(respones)

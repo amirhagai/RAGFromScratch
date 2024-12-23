@@ -12,7 +12,9 @@ def load_env_keys():
     os.environ['COHERE_API_KEY'] = os.getenv('COHERE_API_KEY')
     os.environ['TAVILY_API_KEY'] = os.getenv('TAVILY_API_KEY')
     os.environ['USER_AGENT'] = os.getenv('USER_AGENT', 'myagent')
+    os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
 
 
 def offline_transformers():
     os.environ['TRANSFORMERS_OFFLINE'] = os.getenv('TRANSFORMERS_OFFLINE')
+    os.environ['HF_HUB_OFFLINE'] = os.getenv('HF_HUB_OFFLINE')

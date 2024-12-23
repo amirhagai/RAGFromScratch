@@ -1,5 +1,6 @@
 from load_env_keys import load_env_keys, offline_transformers
 load_env_keys()
+offline_transformers()
 import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, set_seed
@@ -23,6 +24,7 @@ model = AutoModelForCausalLM.from_pretrained(
     local_model_path,
     torch_dtype=torch.bfloat16,
     device_map="auto",
+
 )
 
 # Create a text-generation pipeline with the loaded model and tokenizer
@@ -38,4 +40,7 @@ text_generation_pipeline = pipeline(
 # Integrate the pipeline with LangChain's HuggingFacePipeline
 llm = HuggingFacePipeline(pipeline=text_generation_pipeline)
 
-print(llm.invoke("do you think it will rain today?"))
+
+res = llm.invoke("do you think it will rain today?")
+
+
