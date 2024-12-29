@@ -159,6 +159,48 @@ def get_retrive_prompt_chain(retriever, prompt):
     )
     return retrive_prompt_chain
 
+def reciprocal_rank_fusion(results: list[list], k=60):
+    """ Reciprocal_rank_fusion that takes multiple lists of ranked documents 
+        and an optional parameter k used in the RRF formula """
+    
+    # Initialize a dictionary to hold fused scores for each unique document
+    fused_scores = {}
+
+    # Iterate through each list of ranked documents
+    for docs in results:
+        # Iterate through each document in the list, with its rank (position in the list)
+        for rank, doc in enumerate(docs):
+            # Convert the document to a string format to use as a key (assumes documents can be serialized to JSON)
+            doc_str = dumps(doc)
+            # If the document is not yet in the fused_scores dictionary, add it with an initial score of 0
+            if doc_str not in fused_scores:
+                fused_scores[doc_str] = 0
+            # Retrieve the current score of the document, if any
+            previous_score = fused_scores[doc_str]
+            # Update the score of the document using the RRF formula: 1 / (rank + k)
+            fused_scores[doc_str] += 1 / (rank + k)
+
+    # Sort the documents based on their fused scores in descending order to get the final reranked results
+    reranked_results = [
+        (f'document - {loads(doc).page_content}', f'relevance according to Reciprocal rank fusion  - {score}')
+        for doc, score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # Return the reranked results as a list of tuples, each containing the document and its fused score
+    return reranked_results
+
+def rag_fusion(retriever, prompt, llm, question="What is Task Decomposition?", how_many_questions="five"):
+    _, generate_queries  = get_multy_query_rag_retrival_chain(retriever, llm, how_many_questions, question)
+    retrieval_chain_rag_fusion = generate_queries | retriever.map() | reciprocal_rank_fusion
+    # docs = retrieval_chain_rag_fusion.invoke({"question": question})
+    retrive_prompt_chain = (
+        {"context": retrieval_chain_rag_fusion, "question": itemgetter("question")} 
+        | prompt
+    )
+    retrive_prompt = retrive_prompt_chain.invoke({"question":question})
+    return retrive_prompt
+
+
 
 def llama_rag(return_full_text):
     docs = load_web_doc()
@@ -178,11 +220,22 @@ def llama_multy_query_rag():
     retrieval_chain, generate_queries, retrive_prompt_chain, retrive_prompt = multy_query_rag(retriever, prompt, llm, question="What is Task Decomposition?", how_many_questions="five")
 
     print("############################################", end="\n\n\n")
-    result = llm(llm.invoke(retrive_prompt.messages[0].content, pipeline_kwargs={'return_full_text' : False}))
+    result = llm.invoke(retrive_prompt.messages[0].content, pipeline_kwargs={'return_full_text' : False})
+    print(result)
+
+def llama_RAG_fusion():
+    docs = load_web_doc()
+    text_splitter, splits = split_docs(docs=docs)
+    vectorstore, retriever = embed(splits=splits, delete_old=True)
+    prompt, llm = load_prompt_and_model(max_new_tokns=512)
+    retrive_prompt = rag_fusion(retriever, prompt, llm, question="What is Task Decomposition?", how_many_questions="five")
+    msg = [p.to_string() for p in [retrive_prompt]][0]
+    result = llm.invoke(msg.replace('Human', 'user'), pipeline_kwargs={'return_full_text' : False})
     print(result)
 
 if __name__ == '__main__':
-
+    llama_RAG_fusion()
+    print("##########")
     llama_multy_query_rag()
     # docs, text_splitter, splits, vectorstore, retriever, prompt, llm, retrive_prompt_chain, retrive_prompt, respones = llama_rag(return_full_text=False)
     # print(respones)
