@@ -12,6 +12,7 @@ __pycache__/
 node_modules/
 chroma_langchain_db/
 meta-llama
+data/
 models*
 .vscode
 # Ignore Docker build files
