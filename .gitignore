@@ -12,7 +12,9 @@ __pycache__/
 node_modules/
 chroma_langchain_db/
 meta-llama
+hebrew_whisper/
 data/
+models--dunzhang--stella_en_1.5B_v5/
 models*
 .vscode
 # Ignore Docker build files
